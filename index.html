@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+
+  <body>
+    <div id="main">
+      <div id="pixelBox">
+        <!-- <canvas id="pb0" width="800" height="600"></canvas>
+        <canvas id="pb1" width="800" height="600"></canvas> -->
+      </div>
+    </div>
+    <div id="guide">
+      <h3>移动视角</h3><br>
+      按住左键：<br>
+      鼠标: 转动<br>
+      WASD: 前后左右<br>
+      QE: 升降<br>
+    </div>
+    <!-- <div id="testdiv"></div> -->
+    <div id="controlBox">
+      <p><input checked type="checkbox" id="IsClip" /> 裁剪</p>
+      <p><input type="checkbox" id="IsLine" /> 线框</p>
+      <p><input checked type="checkbox" id="IsCullBack" /> 背面剔除</p>
+
+    </div>
+
+  </body>
+  <style>
+    .little{
+      width: 15px;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    canvas {
+      position: absolute;
+    }
+    #main {
+      width: 100%;
+      height: 100%;
+    }
+    #guide{
+      top: 10px;
+      left: 850px;
+    }
+    #controlBox{
+      top: 200px;
+      left: 850px;
+      font-size: medium;
+    }
+    div {
+      position: absolute;
+      display: inline-block;
+    }
+    #pixelBox {
+      top: 0px;
+      left: 0px;
+      width: 800px;
+      height: 600px;
+      position: relative;
+      background-color: rgb(224, 224, 224);
+    }
+  </style>
+    <!-- <script src="jquery-3.3.1.min.js"></script> -->
+    <script src="matrixTool.js"></script>
+    <script src="Camera.js"></script>
+    <script src="Graphics.js"></script>
+    <script src="Texture.js"></script>
+    <script src="ShapeCon.js"></script>
+    <script src="keyMouseInput.js"></script>
+    <script src="Effects.js"></script>
+    <script src="OBJLoader.js"></script>
+    <script src="Main.js"></script>
+
+</html>
