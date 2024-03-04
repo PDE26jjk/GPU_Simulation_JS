@@ -44,7 +44,7 @@ class Gfx {
     this.uniqueLines = new Set();
     this.MainCamera = null;
     /**
-     * 定义两个cav，模拟交换链中的前后缓冲，每次绘制就将元素更新到隐藏的div,调用Present就交换显示隐藏。
+     * 定义两个canvas，模拟交换链中的前后缓冲，每次绘制就将元素更新到隐藏的div,调用Present就交换显示隐藏。
      */
     this.preIndex = 0; //前后缓冲的序号
     this.preBuffer = [document.createElement('canvas'), document.createElement('canvas')];
@@ -169,7 +169,11 @@ class Gfx {
           posVS.vct[0] *= pixelBox_W
           posVS.vct[1] = posVS.vct[1] * -0.5 + 0.5;
           posVS.vct[1] *= pixelBox_H
-          return p[posVSname]
+          return p[posVSname].copy()
+        })
+        triangle = triangle.map(t => {
+          t.vct[1] = t.vct[1] + 0.5 << 0 // 防止插值后边缘毛躁
+          return t
         })
         zs = new Vector(zs)
         // console.log(triangle[0].vct,triangle[1].vct,triangle[2].vct);
@@ -330,13 +334,17 @@ class Gfx {
     const [x1, y1, x2, y2, x3, y3] = [...triangle[0].xy(), ...triangle[1].xy(), ...triangle[2].xy()]
 
     let data = {}
+    // 方便插值用
     Object.keys(primitiveData[0]).forEach(k => {
       let d = null
       let v = primitiveData[0][k]
       if (v instanceof Vector) {
         d = []
         for (let index = 0; index < 4; index++) {
-          d.push(new Vector([primitiveData[0][k].vct[index], primitiveData[1][k].vct[index], primitiveData[2][k].vct[index]]).Mul(zs))
+          d.push(new Vector([
+            primitiveData[0][k].vct[index],
+            primitiveData[1][k].vct[index],
+            primitiveData[2][k].vct[index]]).Mul(zs))
         }
       }
       else {
@@ -347,16 +355,15 @@ class Gfx {
 
     let newlines = [];
     lines.forEach((line) => {
-      if (line[1].y() - line[0].y()) { // 同一行的边剔除
+      if (Math.abs(line[1].y() - line[0].y()) > 0.3) { // 同一行的边剔除
         if (line[0].y() > line[1].y()) { // y值大的放后面
           [line[0], line[1]] = [line[1], line[0]];
         }
-        let y = line[0].y() + 0.5 << 0
+        let y = line[0].y()
         if (typeof newlines[y] == 'undefined') newlines[y] = [];
         let slot = newlines[y];//slot:[x0,[vector2],x的增量,z的增量]
         line.push((line[1].x() - line[0].x()) / (line[1].y() - line[0].y()));//x的增量
-        line.push((line[1].z() - line[0].z()) / (line[1].y() - line[0].y()));//z的增量
-        line[1] = line[1].y() + 0.5 << 0;
+        line[1] = line[1].y()
         slot.push(line);
       }
     });
@@ -397,7 +404,6 @@ class Gfx {
       for (let i = 0; i < scanline.length; i++) {
         drawX.push(scanline[i][0]);
         scanline[i][0].vct[0] += scanline[i][2];// x增
-        scanline[i][0].vct[2] += scanline[i][3];// z增
         if (scanline[i][1] == y) {
           scanline.splice(i, 1);
           i--;
@@ -464,7 +470,7 @@ class Gfx {
         let color = material.PS(v2f)
 
         let colorStr = `rgba(${(color.vct[0] * 255)}, ${(color.vct[1] * 255)}, ${(color.vct[2] * 255)}, ${(color.vct[3] * 255)})`
-
+        
         this.preBuffer[this.preIndex].fillStyle = colorStr;
         this.DrawRect(x, y, 1, 1);
       } else {
