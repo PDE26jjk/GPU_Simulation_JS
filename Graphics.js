@@ -132,7 +132,7 @@ class Gfx {
       }
       for (let index = 0; index < shape.indices.length; index++) {
 
-        // if(index>= 1) break
+        // if(index!= 10) continue
         const indexGroup = shape.indices[index];
 
         let primitive = []
@@ -160,7 +160,10 @@ class Gfx {
 
           primitive.push(v2f)// 未插值
         })// primitive
+
+        let zs = []
         let triangle = primitive.map(p => {
+          zs.push(1 / p[posVSname].z())
           let posVS = p[posVSname].MulScale(1 / p[posVSname].w())
           posVS.vct[0] = posVS.vct[0] * -0.5 + 0.5;
           posVS.vct[0] *= pixelBox_W
@@ -168,6 +171,7 @@ class Gfx {
           posVS.vct[1] *= pixelBox_H
           return p[posVSname]
         })
+        zs = new Vector(zs)
         // console.log(triangle[0].vct,triangle[1].vct,triangle[2].vct);
         // 视锥裁剪
         if (this.useClipTriangle)
@@ -185,7 +189,7 @@ class Gfx {
         // 完成深度测试、调用像素着色器
         // this.preBuffer[this.preIndex].fillStyle = "#f00";
         if (!this.useLineRender)
-          this.FillTriangle(triangle, posVSname, primitive, material)
+          this.FillTriangle(triangle, zs, primitive, material)
         else {
           this.DrawLineOneBox(...triangle[0].xy(), ...triangle[1].xy());
           this.DrawLineOneBox(...triangle[0].xy(), ...triangle[2].xy());
@@ -309,94 +313,69 @@ class Gfx {
     cav.closePath();
     cav.stroke();
   }
-  FillTriangle(triangle, posVSname, primitiveData, material) {
+  /**
+   * @param triangle 三角形三个点，在屏幕空间
+   * @param zs 三个点的z的倒数，没有经过透视除法（1/w)，透视校正插值用
+   * @param primitiveData 要插值的数据
+   * @param {Material} material 材质
+   */
+  FillTriangle(triangle, zs, primitiveData, material) {
     if (triangle.length != 3) return;
-
-    let data = [0, 1, 2].map(i => { return { pos: triangle[i], data: primitiveData[i] } })
-    // 
     let lines = [];
-    let copyData = (dataOri) => {
-      let dataCopy = { data: {} }
-      Object.keys(primitiveData[0]).forEach(k => {
-        if (dataOri.data[k] instanceof Vector) {
-          dataCopy.data[k] = dataOri.data[k].copy()
-        }
-        else
-          dataCopy.data[k] = dataOri.data[k]
-      })
-      dataCopy.pos = dataCopy.data[posVSname]
-      return dataCopy
-    }
-    lines.push([copyData(data[0]), copyData(data[1])]);
-    lines.push([copyData(data[0]), copyData(data[2])]);
-    lines.push([copyData(data[1]), copyData(data[2])]);
-    const [x1, y1, z1, x2, y2, z2, x3, y3, z3] = [...triangle[0].xyz(), ...triangle[1].xyz(), ...triangle[2].xyz()]
-    const zs = new Vector([1/z1,1/z2,1/z3]) 
-    let newlines = [];
-    let _data = {}
+
+    lines.push([triangle[0].copy(), triangle[1].copy()]);
+    lines.push([triangle[0].copy(), triangle[2].copy()]);
+    lines.push([triangle[1].copy(), triangle[2].copy()]);
+
+    const [x1, y1, x2, y2, x3, y3] = [...triangle[0].xy(), ...triangle[1].xy(), ...triangle[2].xy()]
+
+    let data = {}
     Object.keys(primitiveData[0]).forEach(k => {
       let d = null
       let v = primitiveData[0][k]
       if (v instanceof Vector) {
         d = []
-        for (let index = 0; index < 3; index++) {
-          d.push(new Vector([primitiveData[0][k].vct[index],primitiveData[1][k].vct[index],primitiveData[2][k].vct[index]]).Mul(zs))
+        for (let index = 0; index < 4; index++) {
+          d.push(new Vector([primitiveData[0][k].vct[index], primitiveData[1][k].vct[index], primitiveData[2][k].vct[index]]).Mul(zs))
         }
       }
-      else{
-        d = new Vector([primitiveData[0][k],primitiveData[1][k],primitiveData[2][k]]).Mul(zs)
+      else {
+        d = new Vector([primitiveData[0][k], primitiveData[1][k], primitiveData[2][k], 0]).Mul(zs)
       }
-      _data[k] = d
+      data[k] = d
     })
-    // console.log(_data);
+
+    let newlines = [];
     lines.forEach((line) => {
-      if (line[1].pos.y() - line[0].pos.y()) { // 同y的边剔除
-        if (line[0].pos.y() > line[1].pos.y()) { // y值大的放后面
+      if (line[1].y() - line[0].y()) { // 同一行的边剔除
+        if (line[0].y() > line[1].y()) { // y值大的放后面
           [line[0], line[1]] = [line[1], line[0]];
         }
-        let y = line[0].pos.y() + 0.5 << 0
+        let y = line[0].y() + 0.5 << 0
         if (typeof newlines[y] == 'undefined') newlines[y] = [];
-        let slot = newlines[y];//slot:[[vector0],y1,{data的增量}]
-        const oneOverDeltaY = 1 / (line[1].pos.y() - line[0].pos.y())
-        // line.push((line[1].pos.x() - line[0].pos.x()) * oneOverDeltaY);//x的增量
-        // line.push((line[1].pos.z() - line[0].pos.z()) * oneOverDeltaY);//z的增量
-        let deltaData = {}
-
-        Object.keys(primitiveData[0]).forEach(k => {
-          if (line[0].data[k] instanceof Vector) {
-
-            deltaData[k] = line[1].data[k].copy().Sub(line[0].data[k]).MulScale(oneOverDeltaY)
-            // line[0].data[k] = line[0].data[k].copy()
-          }
-          else
-            deltaData[k] = (line[1].data[k] - line[0].data[k]) * oneOverDeltaY
-
-        })
-        // console.log(line[0].pos.vct,line[1].pos.vct,deltaData['posVS'].vct);
-        // console.log(line[0].data["color"].vct);
-        line[0].pos = line[0].data[posVSname]
-        line.push(deltaData);
-        line[1] = line[1].pos.y() + 0.5 << 0;
+        let slot = newlines[y];//slot:[x0,[vector2],x的增量,z的增量]
+        line.push((line[1].x() - line[0].x()) / (line[1].y() - line[0].y()));//x的增量
+        line.push((line[1].z() - line[0].z()) / (line[1].y() - line[0].y()));//z的增量
+        line[1] = line[1].y() + 0.5 << 0;
         slot.push(line);
-
-
       }
     });
 
     let yMin = pixelBox_H;
     let yMax = -1;
+
     triangle.forEach((point) => {
       if (point.y() < yMin) {
         yMin = point.y();
       }
       if (point.y() > yMax) yMax = point.y();
     });
+
     if (yMin > pixelBox_H || yMax < 0) return
 
-    
     const oneOverArea = 1 / (x1 * (y2 - y3) + x2 * (y3 - y1) + x3 * (y1 - y2))
     const ys = [(y2 - y3) * oneOverArea, (y3 - y1) * oneOverArea, (y1 - y2) * oneOverArea]
-    
+
     yMin = Math.floor(Math.max(yMin, 0))
     yMax = Math.floor(Math.min(yMax, pixelBox_H))
     let scanline = [];
@@ -407,46 +386,37 @@ class Gfx {
           scanline.push(e);
         });
         scanline.sort((a, b) => {
-          if (!(a[0].pos.x() - b[0].pos.x())) {
-            return a[2][posVSname].x() - b[2][posVSname].x();
+          if (!(a[0].x() - b[0].x())) {
+            return a[2] - b[2];
           }
-          return a[0].pos.x() - b[0].pos.x();
+          return a[0].x() - b[0].x();
         });
       }
 
       drawX = [];
       for (let i = 0; i < scanline.length; i++) {
         drawX.push(scanline[i][0]);
-        // scanline[i][0].pos.vct[0] += scanline[i][2];// x增
-        // scanline[i][0].pos.vct[2] += scanline[i][3];// z增
-        Object.keys(primitiveData[0]).forEach(k => {// data增
-          if (scanline[i][0].data[k] instanceof Vector) {
-            // console.log(k,'1',scanline[0][0].data[k],scanline[1][0].data[k]);
-            scanline[i][0].data[k].Add(scanline[i][2][k])
-            // console.log(k,'2',scanline[0][0].data[k],scanline[1][0].data[k]);
-          }
-
-          else
-            scanline[i][0].data[k] += scanline[i][2][k]
-        })
+        scanline[i][0].vct[0] += scanline[i][2];// x增
+        scanline[i][0].vct[2] += scanline[i][3];// z增
         if (scanline[i][1] == y) {
           scanline.splice(i, 1);
           i--;
           drawX.pop();
         }
       }
-      let IsFirstPoint = true;// 扫描线算法考虑了一行中多个线段，我们现在只画三角形，只有一个线段
+      // console.log(zs);
+      let IsFirstPoint = true;
       const l1 = (x2 * (y3 - y) + x3 * (y - y2)) * oneOverArea//计算重心的中间变量
       const l2 = (x3 * (y1 - y) + x1 * (y - y3)) * oneOverArea
       const l3 = (x1 * (y2 - y) + x2 * (y - y1)) * oneOverArea
       for (let i = 0; i < drawX.length; i++) {
         if (!IsFirstPoint) {
-          // console.log(drawX[i - 1].pos === drawX[i].pos);
-          this.DrawXLine(drawX[i - 1], drawX[i], y, ys, [l1, l2, l3], triangle, material);
+          this.DrawXLine(drawX[i - 1], drawX[i], y, ys, [l1, l2, l3], zs, data, material);
         }
         IsFirstPoint = !IsFirstPoint;
       }
     }
+
   }
 
   /**
@@ -456,43 +426,54 @@ class Gfx {
    * @param {number} y 
    * @param {Material} material 
    */
-  DrawXLine(v0, v1, y, ys, ls, triangle, material) {
-    let x0 = v0.pos.x();
-    let x1 = v1.pos.x();
-    let z0 = v0.pos.z();
-    let z1 = v1.pos.z();
-    let z;
+  DrawXLine(v0, v1, y, ys, _ls, zs, data, material) {
+    let x0 = v0.x();
+    let x1 = v1.x();
+    // console.log(zs);
     let x = Math.max(0, x0)
     let xEnd = Math.min(x1, pixelBox_W)
     y = (y + 0.5) << 0
     x = (x + 0.5) << 0
     for (; x <= xEnd; x++) {
-      const l1 = (ls[0] + x * (ys[0]))
-      const l2 = (ls[1] + x * (ys[1]))
-      const l3 = (ls[2] + x * (ys[2]))
-      const zp = 1 / (l1 / triangle[0].z() + l2 / triangle[1].z() + l3 / triangle[2].z())
-      // console.log(l1,l2,l3,l1+l2+l3);
-      const t = (x - x0) / (x1 - x0)
-      let v2f = {}
+      const ls = [_ls[0] + x * ys[0], _ls[1] + x * ys[1], _ls[2] + x * ys[2]]
+      const zp = 1 / (ls[0] * zs.vct[0] + ls[1] * zs.vct[1] + ls[2] * zs.vct[2])
 
-      z = intr(z0, z1, t);
-      // console.log(x, y);
-      if (this.zTest(x, y, zp)) {
-        Object.keys(v0.data).forEach(k => {
-          v2f[k] = intr(v0.data[k], v1.data[k], t)
+      if (this.zTest(x, y, -zp)) {
+
+        let v2f = {}
+        Object.keys(data).forEach(k => {
+          let d = null
+          if (Array.isArray(data[k])) {// Array of Vector
+            d = new Vector([0, 0, 0, 0])
+            // console.log(data[k]);
+            for (let index = 0; index < 3; index++) {
+              d.vct[0] += data[k][0].vct[index] * ls[index]
+              d.vct[1] += data[k][1].vct[index] * ls[index]
+              d.vct[2] += data[k][2].vct[index] * ls[index]
+              d.vct[3] += data[k][3].vct[index] * ls[index]
+            }
+            d.MulScale(zp)
+            // console.log(zp);
+          }
+          else {
+            d = new Vector(ls).Dot(data[k]).x() * zp
+          }
+          v2f[k] = d
         })
-        // console.log(material.PS(v2f).vct);
-        let color = material.PS(v2f).vct
-        let colorStr = `rgba(${(color[0] * 255)}, ${(color[1] * 255)}, ${(color[2] * 255)}, ${(color[3] * 255)})`
+
+        let color = material.PS(v2f)
+
+        let colorStr = `rgba(${(color.vct[0] * 255)}, ${(color.vct[1] * 255)}, ${(color.vct[2] * 255)}, ${(color.vct[3] * 255)})`
+
         this.preBuffer[this.preIndex].fillStyle = colorStr;
-        // console.log(this.preBuffer[this.preIndex].fillStyle);
-        // this.preBuffer[this.preIndex].fillStyle = "rgba(255, 1, 1, 1)"
-        // this.preBuffer[this.preIndex].fillStyle = "#ff0";
         this.DrawRect(x, y, 1, 1);
+      } else {
+        // console.log(zp);
       }
     }
   }
   zTest(x, y, z) {
+    // return true
     if (x > this.width || y > this.height || x < 0 || y < 0) return false;
 
     if (typeof zbuffer[y] == 'undefined') {

@@ -67,26 +67,29 @@ function VS(appData,parameters){
         posWS:new Vector(appData.vert).Transform(GlobalRender.M),
         normalWS:new Vector([...appData.normal,0]).Transform(GlobalRender.M).Normalize(),// 假设均一缩放，否则得乘M矩阵的逆转置，或者把缩放系数提出来
         color:new Vector(appData.color),
-        uv:new Vector([...appData.uv,0,1])
+        uv:new Vector([...appData.uv,0,1]),
+        // u:appData.uv[0]
     }
     return v2f;
 }
 function PS(v2f,parameters){
     let lightDir = new Vector([0,1,-1,0]).Normalize()
-    let {normalWS} =v2f
+    let {normalWS,uv,u} =v2f
     normalWS.Normalize()
     // normalWS.Add(new Vector([1,1,1,0])).MulScale(0.5)
     // normalWS.vct[3] = 1
-    let diff = Math.max(0,lightDir.Dot(normalWS).x())
+    // let diff = Math.max(0,lightDir.Dot(normalWS).x())// 兰伯特
+    let diff = (lightDir.Dot(normalWS).x()+1)*0.5 // 半兰伯特
     let amb = new Vector([1,1,1,0]).MulScale(0.2)
     // let color = v2f.color.MulScale(diff).Add(amb)
     let texture = parameters.texture.sample(...v2f.uv.xy())
     let color = texture.MulScale(diff).Add(amb)
     color.vct[3] = 1
     return color
-    // let pos = appData.vert;
 }
+
 let parameters = {
     texture:new Texture('Models/UV_Grid_Sm.jpg')
 }
+
 const DefaultMaterial = new Material(new Shader(VS,PS,appData,v2f),parameters)

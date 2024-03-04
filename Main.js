@@ -28,7 +28,7 @@ window.onload = function () {
 var g_timeGapDefault = 10;
 var g_timeGapFrame = 10;
 
-LoadObjPath('Models/a.obj').then(shapes => {
+LoadObjPath('Models/box.obj').then(shapes => {
   shapes.forEach(shape => {
     gfx.AddShape(shape)
   })
