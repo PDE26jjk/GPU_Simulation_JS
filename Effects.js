@@ -80,9 +80,9 @@ function PS(v2f,parameters){
     // normalWS.vct[3] = 1
     // let diff = Math.max(0,lightDir.Dot(normalWS).x())// 兰伯特
     let diff = (lightDir.Dot(normalWS).x()+1)*0.5 // 半兰伯特
-    let amb = new Vector([1,1,1,0]).MulScale(0.2)
-    // let color = v2f.color.MulScale(diff).Add(amb)
-    let texture = parameters.texture.sample(...v2f.uv.xy())
+    let amb = new Vector([1,1,1,0]).MulScale(0.1)
+    // let color = new Vector([diff,diff,diff]).Add(amb)
+    let texture = parameters.texture.sample(...v2f.uv.xy()).MulScale(1)
     let color = texture.MulScale(diff).Add(amb)
     color.vct[3] = 1
     return color

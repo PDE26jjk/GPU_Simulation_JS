@@ -1,10 +1,6 @@
-var d1 = new Date().getTime();
+var d1,d2;
 
 var zbuffer;
-
-// console.log(zbuffer);
-var d2 = new Date().getTime();
-console.log(d2 - d1);
 
 window.onload = function () {
   function render() {
@@ -14,27 +10,23 @@ window.onload = function () {
 
     d2 = new Date().getTime();
     g_timeGapFrame = d2 - d1;
-    // console.log();
     clearInterval(set1);
     set1 = setInterval(render, g_timeGapDefault > g_timeGapFrame ? g_timeGapDefault : g_timeGapFrame);
     document.title = '每帧:' + g_timeGapFrame + 'ms';
   };
   var set1 = setInterval(render, g_timeGapDefault);
-
-  // gfx.DrawLineOneBox(319,404,269,404);
-  // gfx.DrawLineOneBox(100,100,100,200);
-  // gfx.DrawLine(50,50,100,100);
 };
 var g_timeGapDefault = 10;
 var g_timeGapFrame = 10;
 
-LoadObjPath('Models/box.obj').then(shapes => {
+LoadObjPath('Models/ball2.obj').then(shapes => {
   shapes.forEach(shape => {
+    shape.setMaterial(DefaultMaterial)
     gfx.AddShape(shape)
   })
 })
 
-let pos = new Vector([-2, 0, -8, 1]);
+let pos = new Vector([0, 0, -6, 1]);
 let dir = new Vector([0, 0, 1, 0]);
 var camera = new Camera(pos, dir);
 
